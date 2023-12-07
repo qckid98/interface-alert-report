@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,12 +9,13 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type splunkWebhook struct {
 	Owner      string `json:"owner"`
 	SearchName string `json:"search_name"`
-	ResultLink string `json:"result_link"`
+	ResultLink string `json:"results_link"`
 	Result     Result `json:"result"`
 }
 
@@ -29,6 +31,18 @@ type Result struct {
 }
 
 func main() {
+	// Connect to the database
+	db, err := sql.Open("mysql", "root:root1234@tcp(10.62.170.172:3306)/alert")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err.Error())
+	}
+
 	r := gin.Default()
 	r.Use(cors.Default())
 
@@ -55,7 +69,7 @@ func main() {
 		fmt.Println(webhook)
 
 		// Respond to Splunk with a success message
-		c.JSON(http.StatusOK, gin.H{"message": "Webhook data received successfully"})
+		c.JSON(http.StatusOK, gin.H{"data": webhook})
 	})
 
 	r.Run(":8080")
