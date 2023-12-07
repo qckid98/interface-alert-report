@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -26,9 +25,7 @@ type Result struct {
 	Raw      string `json:"_raw"`
 	HostName string `json:"hostname"`
 	Host     string `json:"host"`
-	UnixTime int64  `json:"_time"`
-
-	Time time.Time
+	DateTime string `json:"date_time"`
 }
 
 func main() {
@@ -54,10 +51,6 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse JSON payload"})
 			return
 		}
-
-		location := time.FixedZone("Asia/Bangkok", 7*60*60)
-
-		webhook.Result.Time = time.Unix(webhook.Result.UnixTime, 0).In(location)
 
 		fmt.Println(webhook)
 
