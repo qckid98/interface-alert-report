@@ -1,9 +1,7 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -20,31 +18,30 @@ type splunkWebhook struct {
 }
 
 type Result struct {
-	Message  string `json:"status"`
-	Problem  string `json:"unknown_cmd"`
-	Severity string `json:"aseverity"`
-	User     string `json:"user"`
-	Raw      string `json:"_raw"`
-	HostName string `json:"hostname"`
-	Host     string `json:"host"`
-	DateTime string `json:"date_time"`
+	Severity  string `json:"aseverity"`
+	Severity2 string `json:"Severity"`
+	Raw       string `json:"_raw"`
+	HostName  string `json:"hostname"`
+	Host      string `json:"host"`
+	DateTime  string `json:"date_time"`
 }
 
 func main() {
 	// Connect to the database
-	db, err := sql.Open("mysql", "root:root1234@tcp(10.62.170.172:3306)/alert")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		panic(err.Error())
-	}
 
 	r := gin.Default()
 	r.Use(cors.Default())
+
+	// db, err := sql.Open("mysql", "root:root1234@tcp(10.62.170.172:3306)/alert")
+	// if err != nil {
+	// 	panic(err.Error())
+	// }
+	// defer db.Close()
+
+	// err = db.Ping()
+	// if err != nil {
+	// 	panic(err.Error())
+	// }
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Hello World!"})
@@ -66,10 +63,16 @@ func main() {
 			return
 		}
 
-		fmt.Println(webhook)
+		if webhook.Result.Severity == "" {
+			if webhook.Result.Severity2 == "" {
+				webhook.Result.Severity = "HIGH"
+			} else {
+				webhook.Result.Severity = webhook.Result.Severity2
+			}
+		}
 
 		// Respond to Splunk with a success message
-		c.JSON(http.StatusOK, gin.H{"data": webhook})
+		c.JSON(http.StatusOK, gin.H{"owner": webhook.Owner, "search_name": webhook.SearchName, "results_link": webhook.ResultLink, "severity": webhook.Result.Severity, "hostname": webhook.Result.HostName, "host": webhook.Result.Host, "date_time": webhook.Result.DateTime, "message": webhook.Result.Raw})
 	})
 
 	r.Run(":8080")
