@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -32,16 +34,16 @@ func main() {
 	r := gin.Default()
 	r.Use(cors.Default())
 
-	// db, err := sql.Open("mysql", "root:root1234@tcp(10.62.170.172:3306)/alert")
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
-	// defer db.Close()
+	db, err := sql.Open("mysql", "root:root1234@tcp(10.62.170.172:3306)/alert_db")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
 
-	// err = db.Ping()
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
+	err = db.Ping()
+	if err != nil {
+		panic(err.Error())
+	}
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Hello World!"})
@@ -70,6 +72,14 @@ func main() {
 				webhook.Result.Severity = webhook.Result.Severity2
 			}
 		}
+
+		jsonData, err := json.Marshal(webhook)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to marshal JSON payload"})
+			return
+		}
+
+		fmt.Println(string(jsonData))
 
 		// Respond to Splunk with a success message
 		c.JSON(http.StatusOK, gin.H{"owner": webhook.Owner, "search_name": webhook.SearchName, "results_link": webhook.ResultLink, "severity": webhook.Result.Severity, "hostname": webhook.Result.HostName, "host": webhook.Result.Host, "date_time": webhook.Result.DateTime, "message": webhook.Result.Raw})
