@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -34,7 +35,8 @@ func main() {
 	r := gin.Default()
 	r.Use(cors.Default())
 
-	db, err := sql.Open("mysql", "root:root1234@tcp(10.62.170.172:3306)/alert_db")
+	// db, err := sql.Open("mysql", "root:root1234@tcp(10.62.170.172:3306)/alert_db")
+	db, err := sql.Open("mysql", "root:babihutan123@tcp(localhost:3306)/alert_db")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -46,7 +48,42 @@ func main() {
 	}
 
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Hello World!"})
+		readAll, err := db.Query("SELECT * FROM alert_db.report")
+		if err != nil {
+			panic(err.Error())
+		}
+
+		defer readAll.Close()
+
+		var result []map[string]interface{}
+
+		for readAll.Next() {
+			var (
+				Name     string
+				Link     string
+				Severity string
+				Date     string
+				Message  string
+				Host     string
+				Owner    string
+			)
+			err := readAll.Scan(&Name, &Link, &Severity, &Date, &Message, &Host, &Owner)
+			if err != nil {
+				panic(err.Error())
+			}
+
+			result = append(result, map[string]interface{}{
+				"Name":     Name,
+				"Link":     Link,
+				"Severity": Severity,
+				"Date":     Date,
+				"Message":  Message,
+				"Host":     Host,
+				"Owner":    Owner,
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{"result": result})
 	})
 
 	r.POST("/splunk-webhook", func(c *gin.Context) {
@@ -73,16 +110,19 @@ func main() {
 			}
 		}
 
-		jsonData, err := json.Marshal(webhook)
+		t := time.Now()
+
+		FullDate := strconv.Itoa(t.Year()) + " " + webhook.Result.DateTime
+
+		insert, err := db.Query("INSERT INTO alert_db.report (Name, Link, Severity, Date, Message, Host, Owner) VALUES (?, ?, ?, ?, ?, ?, ?)", webhook.SearchName, webhook.ResultLink, webhook.Result.Severity, FullDate, webhook.Result.Raw, webhook.Result.Host, webhook.Owner)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to marshal JSON payload"})
-			return
+			panic(err.Error())
 		}
 
-		fmt.Println(string(jsonData))
+		defer insert.Close()
 
 		// Respond to Splunk with a success message
-		c.JSON(http.StatusOK, gin.H{"owner": webhook.Owner, "search_name": webhook.SearchName, "results_link": webhook.ResultLink, "severity": webhook.Result.Severity, "hostname": webhook.Result.HostName, "host": webhook.Result.Host, "date_time": webhook.Result.DateTime, "message": webhook.Result.Raw})
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully processed Splunk webhook"})
 	})
 
 	r.Run(":8080")
